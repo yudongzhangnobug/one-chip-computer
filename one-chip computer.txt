@@ -1,0 +1,123 @@
+//1.延时子程序500us
+DELAY:	MOV R2,#25
+LOOP3:	MOV R1,#40
+LOOP2:	MOV R0,#250
+LOOP1:	DJNZ R0,LOOP1
+	DJNZ R1,LOOP2
+	DJNZ R2,LOOP3
+
+
+2.查询程序
+	ORG 0000H
+	AJMP MAIN
+	ORG 0100H
+	MOV R0,#2FH
+	MOV R1,#0
+MAIN:
+LOOP2:	INC R0       
+      	CJNE @R0,#0AAH,LOOP1
+     	INC R1
+     	AJMP LOOP2
+
+LOOP1:	CJNE R0,#60H,LOOP2   
+      	END
+
+3.定时器方波
+例：假设fosc=12MHz，使用定时器/计数器T0，工作在方式1，实现在P1.3引脚输出50HZ的方波
+50Hz即1/50 s  所以方波周期为0.020s=20ms
+即高低电平各为10ms
+定时初值计算，方式1为16位定时器，最大计数值为65536
+因为fosc=12MHz，所以机器周期为1us
+定时时间=（65536-x）* 机器周期
+所以	x=65536-10000=55536=0D8F0H
+因此定时器T0的初值为 TH0=0D8H  TL0=0F0H
+
+ 	ORG 0000H
+  	AJMP MAIN
+  	ORG 000BH
+  	AJMP CTM0
+  	ORG 0030H
+MAIN:	MOV TMOD,#01
+   	MOV TH0,#0D8H
+	MOV TL0,#0F0H
+   	SETB ET0
+   	SETB EA
+	SETB TR0
+WAIT:	SJMP  WAIT
+CTM0:	MOV TH0,#0D8H
+	MOV TL0,#0F0H
+	CPL P1.3  ;
+	RETI
+	END
+4.有占空比为的方波  2:3
+	ORG 0000
+	AJMP MAIN
+	ORG 000BH
+	AJMP CTM0
+	ORG 0030H
+	SETB F0
+MAIN:    	MOV TMOD ,#01
+         	MOV TH0,#015H
+         	MOV TL0,#0A0H
+        	SETB ET0
+         	SETB TR0
+         	SETB EA
+WAIT:    	SJMP WAIT
+CTM0:    	JB  F0,NEXT
+         	MOV TH0,#063H
+         	MOV TL0,#0C0H
+         	CPL P1.0
+         	CPL F0
+         	RETI
+NEXT:    	MOV TH0,#015H
+         	MOV TL0,#0A0H
+         	CPL P1.0
+         	CPL F0
+         	RETI
+         	END  
+
+4.串行口通讯
+串口：
+	ORG 0000H
+	LJMP MAIN
+	ORG 0100H
+MAIN:	MOV SP,#60H
+	MOV R0,#0；此处要看题目给出发送的地址
+	MOV SCON,#80H ;方式二
+LOOP:	LACALL DELAY  ；1s
+	INC R0
+	MOV A,R0
+	MOV SUBF ,A
+	JNB TI,$
+	CLR TI
+	LJMP LOOP
+	END
+
+
+5.按键显示(四个按键)
+P0连接段选码
+P1连接按
+	ORG 0000H     ;P0连接段选码  P1连接按钮  共阳极 
+       	LJMP MAIN
+MAIN:   	MOV DPTR, #0200H
+        	MOV A,P1
+        	CPL A
+       	MOV R1,A
+NEXT0:     CJNE R1,#1,NEXT1
+        	MOV R0,#1
+NEXT1: 	CJNE R1,#2,NEXT2
+        	MOV R0,#2
+        	LJMP NEXT8
+NEXT2:  	CJNE R1,#4,NEXT3
+        	MOV R0,#3
+        	LJMP NEXT8
+NEXT3:  	CJNE R1,#8,NEXT4
+        	MOV R0,#4
+        	LJMP NEXT8
+NEXT8:  	MOV A,R0 ;A为偏移量
+        	MOVC A,@A+DPTR
+       	 MOV P0,A
+        	LJMP MAIN
+        	ORG 0200H
+        	DB 0C0H,0F9H,0A4H,0B0H,99H,92H,82H,0F8H,80H,90H
+
